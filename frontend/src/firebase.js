@@ -8,6 +8,18 @@ const firebaseConfig = {
   authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
 };
 
+// Check for missing environment variables
+const missingKeys = Object.entries(firebaseConfig)
+  .filter(([_, value]) => !value)
+  .map(([key]) => key);
+
+if (missingKeys.length > 0) {
+  console.error(
+    `❌ MISSING FIREBASE KEYS: ${missingKeys.join(', ')}. ` +
+    `Please set these in your .env file or Vercel Environment Variables.`
+  );
+}
+
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 
