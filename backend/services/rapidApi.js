@@ -6,7 +6,8 @@ const execFileAsync = util.promisify(execFile);
 
 async function getReelDirectUrl(reelUrl) {
   try {
-    const ytDlpPath = path.join(__dirname, '..', 'bin', 'yt-dlp');
+    const isLinux = process.platform === 'linux';
+    const ytDlpPath = path.join(__dirname, '..', 'bin', isLinux ? 'yt-dlp_linux' : 'yt-dlp');
     // Using -j to get JSON metadata
     const { stdout } = await execFileAsync(ytDlpPath, ['-j', reelUrl]);
     const data = JSON.parse(stdout);
