@@ -1,0 +1,44 @@
+@import "tailwindcss";
+@source "../index.html";
+@source "../src/**/*.{js,ts,jsx,tsx}";
+
+@theme {
+  --color-background: #09090b;
+  --color-card: #18181b;
+  --color-primary: #3b82f6;
+  --color-muted: #71717a;
+}
+
+@layer base {
+  body {
+    @apply bg-background text-zinc-100 antialiased;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply bg-primary hover:bg-blue-600 text-white font-semibold py-2 px-6 rounded-lg transition duration-200;
+  }
+  .input-field {
+    @apply w-full bg-zinc-800 border border-zinc-700 rounded-lg p-4 text-white placeholder-zinc-500 focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition;
+  }
+  .card {
+    @apply bg-card border border-zinc-800 rounded-xl overflow-hidden shadow-xl;
+  }
+}
+
+/* Custom scrollbar for better dark mode look */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #09090b; 
+}
+::-webkit-scrollbar-thumb {
+  background: #27272a; 
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #3f3f46; 
+}
