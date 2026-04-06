@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState } from 'react';
-import { auth, provider } from '../firebase';
+import { auth, provider, hasFirebaseClientConfig } from '../firebase';
 import { signInWithPopup, signOut, onAuthStateChanged } from 'firebase/auth';
 
 const AuthContext = createContext();
@@ -46,7 +46,7 @@ export function AuthProvider({ children }) {
     firebaseConfigured: !!auth,
   };
 
-  const missingKeys = !import.meta.env.VITE_FIREBASE_API_KEY;
+  const missingKeys = !hasFirebaseClientConfig();
 
   return (
     <AuthContext.Provider value={value}>

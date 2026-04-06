@@ -35,10 +35,14 @@ export default function Login() {
           <p className="text-zinc-400 text-lg">Turn <span className="text-primary font-medium">Reels</span> into Knowledge.</p>
         </div>
         {!firebaseConfigured && (
-          <p className="text-red-400 text-sm text-left">
-            Firebase is not configured. Add <code className="text-zinc-300">VITE_FIREBASE_API_KEY</code>,{' '}
-            <code className="text-zinc-300">VITE_FIREBASE_PROJECT_ID</code>, and{' '}
-            <code className="text-zinc-300">VITE_FIREBASE_AUTH_DOMAIN</code> in Vercel Environment Variables, then redeploy.
+          <p className="text-red-400 text-sm text-left leading-relaxed">
+            Firebase env vars are missing at build time. In Vercel → Settings → Environment Variables, add either{' '}
+            <code className="text-zinc-300">VITE_FIREBASE_CONFIG</code> (paste the full JSON object from Firebase
+            console → Project settings → Your apps), or the three variables{' '}
+            <code className="text-zinc-300">VITE_FIREBASE_API_KEY</code>,{' '}
+            <code className="text-zinc-300">VITE_FIREBASE_PROJECT_ID</code>,{' '}
+            <code className="text-zinc-300">VITE_FIREBASE_AUTH_DOMAIN</code>.
+            Enable them for <strong className="text-zinc-200">Preview</strong> and Production if you use preview URLs, then redeploy.
           </p>
         )}
         <button
