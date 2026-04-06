@@ -8,7 +8,6 @@ const firebaseConfig = {
   authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
 };
 
-// Check for missing environment variables
 const missingKeys = Object.entries(firebaseConfig)
   .filter(([_, value]) => !value)
   .map(([key]) => key);
@@ -20,12 +19,19 @@ if (missingKeys.length > 0) {
   );
 }
 
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
+let db = null;
+let auth = null;
+let provider = null;
 
-// Initialize services
-const db = getFirestore(app);
-const auth = getAuth(app);
-const provider = new GoogleAuthProvider();
+if (missingKeys.length === 0) {
+  try {
+    const app = initializeApp(firebaseConfig);
+    db = getFirestore(app);
+    auth = getAuth(app);
+    provider = new GoogleAuthProvider();
+  } catch (e) {
+    console.error('Firebase initialization failed:', e);
+  }
+}
 
 export { db, auth, provider };

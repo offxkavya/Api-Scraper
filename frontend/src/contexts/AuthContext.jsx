@@ -6,23 +6,26 @@ const AuthContext = createContext();
 
 export function AuthProvider({ children }) {
   const [currentUser, setCurrentUser] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => !!auth);
 
   async function login() {
+    if (!auth || !provider) {
+      throw new Error('Firebase is not configured.');
+    }
     return signInWithPopup(auth, provider);
   }
 
   function logout() {
+    if (!auth) return Promise.resolve();
     return signOut(auth);
   }
 
   useEffect(() => {
-    // Timeout to stop waiting if Firebase fails
+    if (!auth) return;
+
     const timeout = setTimeout(() => {
-      if (loading) {
-        console.warn("Auth check timed out. Firebase might not be configured.");
-        setLoading(false);
-      }
+      console.warn("Auth check timed out. Firebase might not be configured.");
+      setLoading(false);
     }, 5000);
 
     const unsubscribe = onAuthStateChanged(auth, user => {
@@ -34,12 +37,13 @@ export function AuthProvider({ children }) {
       unsubscribe();
       clearTimeout(timeout);
     };
-  }, [loading]);
+  }, []);
 
   const value = {
     currentUser,
     login,
     logout,
+    firebaseConfigured: !!auth,
   };
 
   const missingKeys = !import.meta.env.VITE_FIREBASE_API_KEY;
