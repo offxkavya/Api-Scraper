@@ -10,6 +10,17 @@ export default function Home() {
   const { currentUser } = useAuth();
   const navigate = useNavigate();
 
+  const formatError = (msg) => {
+    if (typeof msg !== 'string') return 'An unexpected error occurred.';
+    if (msg.includes('429') || msg.toLowerCase().includes('quota exceeded') || msg.toLowerCase().includes('too many requests')) {
+      return "The AI is currently busy (Rate Limit reached). Please wait a minute and try again.";
+    }
+    if (msg.includes('503') || msg.toLowerCase().includes('service unavailable')) {
+        return "The AI service is temporarily unavailable. Retrying soon might help.";
+    }
+    return msg;
+  };
+
   async function handleExtract(e) {
     e.preventDefault();
     if (!url) return;
@@ -118,9 +129,17 @@ export default function Home() {
           )}
           
           {status === 'error' && (
-            <div className="mt-6 p-4 bg-red-500/10 border border-red-500/20 text-red-400 rounded-lg flex flex-col gap-2">
-              <span className="font-medium">Error: {errorDesc}</span>
-              <button type="button" onClick={() => setStatus('idle')} className="text-sm underline self-start opacity-80 hover:opacity-100">Try again</button>
+            <div className="mt-6 p-4 bg-red-500/10 border border-red-500/20 text-red-400 rounded-lg flex flex-col gap-2 animate-in fade-in slide-in-from-top-2">
+              <span className="font-medium text-sm md:text-base">
+                {formatError(errorDesc)}
+              </span>
+              <button 
+                type="button" 
+                onClick={() => setStatus('idle')} 
+                className="text-sm font-semibold underline self-start opacity-80 hover:opacity-100 transition-opacity"
+              >
+                Try again
+              </button>
             </div>
           )}
         </div>

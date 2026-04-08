@@ -7,6 +7,42 @@ const { GoogleGenerativeAI } = require("@google/generative-ai");
 const { GoogleAIFileManager } = require("@google/generative-ai/server");
 const Groq = require('groq-sdk');
 
+async function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+/**
+ * Executes a function with exponential backoff for rate limits.
+ */
+async function withRetry(fn, maxRetries = 3, initialDelay = 5000) {
+  let lastError;
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      return await fn();
+    } catch (error) {
+      lastError = error;
+      const isRateLimit = error.message?.includes('429') || 
+                          error.status === 429 || 
+                          error.message?.includes('Quota exceeded');
+      
+      if (isRateLimit && i < maxRetries - 1) {
+        // Extract retry delay from error if present (Google API often includes it)
+        let delay = initialDelay * Math.pow(2, i);
+        if (error.message.includes('retryDelay')) {
+            const match = error.message.match(/retryDelay":"?(\d+)/);
+            if (match && match[1]) delay = parseInt(match[1]) * 1000 + 1000;
+        }
+        
+        console.warn(`Gemini Rate Limit hit (Attempt ${i + 1}/${maxRetries}). Retrying in ${Math.round(delay/1000)}s...`);
+        await sleep(delay);
+        continue;
+      }
+      throw error;
+    }
+  }
+  throw lastError;
+}
+
 async function downloadVideo(url, outputPath) {
   const response = await fetch(url);
   if (!response.ok) throw new Error(`unexpected response downloading video ${response.statusText}`);
@@ -71,8 +107,7 @@ async function processReelVideo(directMp4Url) {
     }
 
     // 4. Step 1: Extract basic raw content via Gemini (Standard Stable Model)
-    console.log("Extracting raw content via Gemini 1.5 Flash...");
-    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+    console.log("Extracting raw content via Gemini...");
     
     const extractionPrompt = `
       Watch this video and provide:
@@ -84,17 +119,40 @@ async function processReelVideo(directMp4Url) {
       VISUALS: ...
     `;
 
-    const extractionResult = await model.generateContent([
-      {
-        fileData: {
-          mimeType: uploadedFile.mimeType,
-          fileUri: uploadedFile.uri
-        }
-      },
-      { text: extractionPrompt },
-    ]);
-
-    const rawContent = extractionResult.response.text();
+    let rawContent;
+    try {
+      // First attempt with 2.0 Flash
+      console.log("Attempting with gemini-2.0-flash...");
+      const model20 = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+      const extractionResult = await withRetry(() => model20.generateContent([
+        {
+          fileData: {
+            mimeType: uploadedFile.mimeType,
+            fileUri: uploadedFile.uri
+          }
+        },
+        { text: extractionPrompt },
+      ]));
+      rawContent = extractionResult.response.text();
+    } catch (e) {
+      const isRateLimit = e.message?.includes('429') || e.message?.includes('Quota exceeded');
+      if (isRateLimit) {
+        console.warn("Gemini 2.0 Flash quota exhausted, falling back to Gemini 1.5 Flash...");
+        const model15 = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+        const extractionResult = await withRetry(() => model15.generateContent([
+          {
+            fileData: {
+              mimeType: uploadedFile.mimeType,
+              fileUri: uploadedFile.uri
+            }
+          },
+          { text: extractionPrompt },
+        ]));
+        rawContent = extractionResult.response.text();
+      } else {
+        throw e;
+      }
+    }
 
     // 5. Step 2: Structure the Knowledge (Reasoning Phase)
     const reasoningPrompt = `
@@ -128,12 +186,13 @@ async function processReelVideo(directMp4Url) {
         finalNote = parseCleanJson(groqRes.choices[0]?.message?.content || "{}");
       } catch (e) {
         console.warn("Groq failed, falling back to Gemini for reasoning:", e.message);
-        const reasoningRes = await model.generateContent(reasoningPrompt);
+        const reasoningRes = await withRetry(() => model20.generateContent(reasoningPrompt));
         finalNote = parseCleanJson(reasoningRes.response.text());
       }
     } else {
       console.log("Using Gemini for all steps...");
-      const reasoningRes = await model.generateContent(reasoningPrompt);
+      const model20 = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+      const reasoningRes = await withRetry(() => model20.generateContent(reasoningPrompt));
       finalNote = parseCleanJson(reasoningRes.response.text());
     }
 
