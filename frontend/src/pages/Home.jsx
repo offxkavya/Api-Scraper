@@ -12,13 +12,22 @@ export default function Home() {
 
   const formatError = (msg) => {
     if (typeof msg !== 'string') return 'An unexpected error occurred.';
+    
+    // Clean up Google's technical prefix
+    let cleanMsg = msg.replace(/^Error: \[GoogleGenerativeAI Error\]: /, '');
+    // Remove the numeric error code block if present [404 Not Found]
+    cleanMsg = cleanMsg.replace(/\[\d+ [^\]]+\]\s*/, '');
+    
     if (msg.includes('429') || msg.toLowerCase().includes('quota exceeded') || msg.toLowerCase().includes('too many requests')) {
       return "The AI is currently busy (Rate Limit reached). Please wait a minute and try again.";
+    }
+    if (msg.includes('404')) {
+        return "The requested AI model version was not found. I've updated the system to use a more stable version; please try again.";
     }
     if (msg.includes('503') || msg.toLowerCase().includes('service unavailable')) {
         return "The AI service is temporarily unavailable. Retrying soon might help.";
     }
-    return msg;
+    return cleanMsg.length > 150 ? cleanMsg.substring(0, 150) + "..." : cleanMsg;
   };
 
   async function handleExtract(e) {
