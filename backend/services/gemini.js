@@ -138,7 +138,7 @@ async function processReelVideo(directMp4Url) {
       const isRateLimit = e.message?.includes('429') || e.message?.includes('Quota exceeded');
       if (isRateLimit) {
         console.warn("Gemini 2.0 Flash quota exhausted, falling back to Gemini 1.5 Flash...");
-        const model15 = genAI.getGenerativeModel({ model: "gemini-1.5-flash-latest" });
+        const model15 = genAI.getGenerativeModel({ model: "gemini-flash-latest" });
         const extractionResult = await withRetry(() => model15.generateContent([
           {
             fileData: {
