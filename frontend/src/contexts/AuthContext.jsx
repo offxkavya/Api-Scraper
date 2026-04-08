@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 import { auth, provider, hasFirebaseClientConfig } from '../firebase';
-import { signInWithPopup, signOut, onAuthStateChanged } from 'firebase/auth';
+import { signInWithPopup, signOut, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword } from 'firebase/auth';
 
 const AuthContext = createContext();
 
@@ -13,6 +13,16 @@ export function AuthProvider({ children }) {
       throw new Error('Firebase is not configured.');
     }
     return signInWithPopup(auth, provider);
+  }
+
+  function signup(email, password) {
+    if (!auth) throw new Error('Firebase is not configured.');
+    return createUserWithEmailAndPassword(auth, email, password);
+  }
+
+  function loginWithEmail(email, password) {
+    if (!auth) throw new Error('Firebase is not configured.');
+    return signInWithEmailAndPassword(auth, email, password);
   }
 
   function logout() {
@@ -42,6 +52,8 @@ export function AuthProvider({ children }) {
   const value = {
     currentUser,
     login,
+    signup,
+    loginWithEmail,
     logout,
     firebaseConfigured: !!auth,
   };
