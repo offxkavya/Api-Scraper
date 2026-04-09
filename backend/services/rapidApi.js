@@ -14,26 +14,25 @@ async function getReelDirectUrl(reelUrl) {
   const RAPIDAPI_KEY = process.env.RAPIDAPI_KEY;
 
   // Strip query parameters like ?utm_source...
-  let cleanUrl = reelUrl.split('?')[0];
+  const cleanUrl = reelUrl.split('?')[0];
 
   // --- STAGE 1: RAPIDAPI (Primary - Most Reliable) ---
   if (RAPIDAPI_KEY) {
     try {
       console.log(`Attempting Stage 1: RapidAPI with clean url: ${cleanUrl}...`);
       
-      const options = {
-        method: 'GET',
-        url: 'https://instagram-downloader-download-instagram-videos-stories1.p.rapidapi.com/index',
-        params: { url: cleanUrl },
-        headers: {
-          'x-rapidapi-key': RAPIDAPI_KEY,
-          'x-rapidapi-host': 'instagram-downloader-download-instagram-videos-stories1.p.rapidapi.com'
+      const response = await fetch(
+        `https://instagram-downloader-download-instagram-videos-stories1.p.rapidapi.com/index?url=${encodeURIComponent(cleanUrl)}`,
+        {
+          method: 'GET',
+          headers: {
+            'x-rapidapi-host': 'instagram-downloader-download-instagram-videos-stories1.p.rapidapi.com',
+            'x-rapidapi-key': process.env.RAPIDAPI_KEY
+          }
         }
-      };
-
-      const response = await axios.request(options);
-      const data = response.data;
-      console.log("RapidAPI raw data received.");
+      );
+      const data = await response.json();
+      console.log('RapidAPI response:', JSON.stringify(data));
 
       let directMp4Url = null;
       let thumbnail = null;
