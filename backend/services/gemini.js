@@ -21,19 +21,19 @@ async function withRetry(fn, maxRetries = 3, initialDelay = 5000) {
       return await fn();
     } catch (error) {
       lastError = error;
-      const isRateLimit = error.message?.includes('429') || 
-                          error.status === 429 || 
-                          error.message?.includes('Quota exceeded');
-      
+      const isRateLimit = error.message?.includes('429') ||
+        error.status === 429 ||
+        error.message?.includes('Quota exceeded');
+
       if (isRateLimit && i < maxRetries - 1) {
         // Extract retry delay from error if present (Google API often includes it)
         let delay = initialDelay * Math.pow(2, i);
         if (error.message.includes('retryDelay')) {
-            const match = error.message.match(/retryDelay":"?(\d+)/);
-            if (match && match[1]) delay = parseInt(match[1]) * 1000 + 1000;
+          const match = error.message.match(/retryDelay":"?(\d+)/);
+          if (match && match[1]) delay = parseInt(match[1]) * 1000 + 1000;
         }
-        
-        console.warn(`Gemini Rate Limit hit (Attempt ${i + 1}/${maxRetries}). Retrying in ${Math.round(delay/1000)}s...`);
+
+        console.warn(`Gemini Rate Limit hit (Attempt ${i + 1}/${maxRetries}). Retrying in ${Math.round(delay / 1000)}s...`);
         await sleep(delay);
         continue;
       }
@@ -43,7 +43,26 @@ async function withRetry(fn, maxRetries = 3, initialDelay = 5000) {
   throw lastError;
 }
 
+/**
+ * Helper to attempt generation with gemini-2.0-flash, falling back to gemini-flash-latest on rate limit.
+ */
+async function generateContentWithFallback(genAI, payload) {
+  try {
+    const model20 = genAI.getGenerativeModel({ model: "gemini-1.5-flash-latest" });
+    return await withRetry(() => model20.generateContent(payload));
+  } catch (e) {
+    const isRateLimit = e.message?.includes('429') || e.message?.includes('Quota exceeded');
+    if (isRateLimit) {
+      console.warn("Gemini 2.0 Flash quota exhausted, falling back to gemini-flash-latest...");
+      const modelFallback = genAI.getGenerativeModel({ model: "gemini-flash-latest" });
+      return await withRetry(() => modelFallback.generateContent(payload));
+    }
+    throw e;
+  }
+}
+
 async function downloadVideo(url, outputPath) {
+
   const response = await fetch(url);
   if (!response.ok) throw new Error(`unexpected response downloading video ${response.statusText}`);
   await parseInt(response.headers.get('content-length') || '0') > 0; // check for content
@@ -80,7 +99,7 @@ async function processReelVideo(directMp4Url) {
   const fileManager = new GoogleAIFileManager(GEMINI_API_KEY);
   const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
   const groq = GROQ_API_KEY ? new Groq({ apiKey: GROQ_API_KEY }) : null;
-  
+
   // 1. Download internally first
   const tmpFilePath = path.join(os.tmpdir(), `reel_${Date.now()}.mp4`);
   await downloadVideo(directMp4Url, tmpFilePath);
@@ -108,7 +127,7 @@ async function processReelVideo(directMp4Url) {
 
     // 4. Step 1: Extract basic raw content via Gemini (Standard Stable Model)
     console.log("Extracting raw content via Gemini...");
-    
+
     const extractionPrompt = `
       Watch this video and provide:
       1. A full transcript of everything spoken.
@@ -119,40 +138,17 @@ async function processReelVideo(directMp4Url) {
       VISUALS: ...
     `;
 
-    let rawContent;
-    try {
-      // First attempt with 2.0 Flash
-      console.log("Attempting with gemini-2.0-flash...");
-      const model20 = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
-      const extractionResult = await withRetry(() => model20.generateContent([
-        {
-          fileData: {
-            mimeType: uploadedFile.mimeType,
-            fileUri: uploadedFile.uri
-          }
-        },
-        { text: extractionPrompt },
-      ]));
-      rawContent = extractionResult.response.text();
-    } catch (e) {
-      const isRateLimit = e.message?.includes('429') || e.message?.includes('Quota exceeded');
-      if (isRateLimit) {
-        console.warn("Gemini 2.0 Flash quota exhausted, falling back to Gemini 1.5 Flash...");
-        const model15 = genAI.getGenerativeModel({ model: "gemini-flash-latest" });
-        const extractionResult = await withRetry(() => model15.generateContent([
-          {
-            fileData: {
-              mimeType: uploadedFile.mimeType,
-              fileUri: uploadedFile.uri
-            }
-          },
-          { text: extractionPrompt },
-        ]));
-        rawContent = extractionResult.response.text();
-      } else {
-        throw e;
-      }
-    }
+    const extractionResult = await generateContentWithFallback(genAI, [
+      {
+        fileData: {
+          mimeType: uploadedFile.mimeType,
+          fileUri: uploadedFile.uri
+        }
+      },
+      { text: extractionPrompt },
+    ]);
+    const rawContent = extractionResult.response.text();
+
 
     // 5. Step 2: Structure the Knowledge (Reasoning Phase)
     const reasoningPrompt = `
@@ -186,13 +182,12 @@ async function processReelVideo(directMp4Url) {
         finalNote = parseCleanJson(groqRes.choices[0]?.message?.content || "{}");
       } catch (e) {
         console.warn("Groq failed, falling back to Gemini for reasoning:", e.message);
-        const reasoningRes = await withRetry(() => model20.generateContent(reasoningPrompt));
+        const reasoningRes = await generateContentWithFallback(genAI, reasoningPrompt);
         finalNote = parseCleanJson(reasoningRes.response.text());
       }
     } else {
       console.log("Using Gemini for all steps...");
-      const model20 = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
-      const reasoningRes = await withRetry(() => model20.generateContent(reasoningPrompt));
+      const reasoningRes = await generateContentWithFallback(genAI, reasoningPrompt);
       finalNote = parseCleanJson(reasoningRes.response.text());
     }
 
@@ -205,9 +200,9 @@ async function processReelVideo(directMp4Url) {
     }
     if (uploadedFile) {
       try {
-         await fileManager.deleteFile(uploadedFile.name);
+        await fileManager.deleteFile(uploadedFile.name);
       } catch (e) {
-         console.warn("Failed to delete remote file from Gemini API", e);
+        console.warn("Failed to delete remote file from Gemini API", e);
       }
     }
   }
