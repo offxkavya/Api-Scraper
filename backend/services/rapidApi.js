@@ -14,53 +14,43 @@ async function getReelDirectUrl(reelUrl) {
   const RAPIDAPI_KEY = process.env.RAPIDAPI_KEY;
 
   // Strip query parameters like ?utm_source...
-  let cleanUrl = reelUrl;
-  try {
-    const parsed = new URL(reelUrl);
-    cleanUrl = `${parsed.protocol}//${parsed.host}${parsed.pathname}`;
-  } catch (e) {
-    cleanUrl = reelUrl.split('?')[0];
-  }
+  let cleanUrl = reelUrl.split('?')[0];
 
   // --- STAGE 1: RAPIDAPI (Primary - Most Reliable) ---
   if (RAPIDAPI_KEY) {
     try {
-      console.log(`Attempting Stage 1: RapidAPI with url: ${cleanUrl}...`);
-      // Using requested instagram-downloader API
-      const response = await axios.request({
+      console.log(`Attempting Stage 1: RapidAPI with clean url: ${cleanUrl}...`);
+      
+      const options = {
         method: 'GET',
         url: 'https://instagram-downloader-download-instagram-videos-stories1.p.rapidapi.com/index',
         params: { url: cleanUrl },
         headers: {
           'x-rapidapi-key': RAPIDAPI_KEY,
           'x-rapidapi-host': 'instagram-downloader-download-instagram-videos-stories1.p.rapidapi.com'
-        },
-        timeout: 10000
-      });
+        }
+      };
 
-      // Adapt to potentially different response structure of the new API
-      // (Many of these APIs return a 'media' array or 'video' direct url)
+      const response = await axios.request(options);
       const data = response.data;
+      console.log("RapidAPI raw data received.");
+
       let directMp4Url = null;
       let thumbnail = null;
 
-      if (data && data.media && typeof data.media === 'string') {
+      // Adapt to the specific response structure of this API
+      // Usually returns { media: "url", thumbnail: "url", title: "..." }
+      if (data) {
+        if (typeof data.media === 'string') {
           directMp4Url = data.media;
-          thumbnail = data.thumbnail || null;
-      } else if (data && data[0] && data[0].media) {
+          thumbnail = data.thumbnail;
+        } else if (data.url) {
+          directMp4Url = data.url;
+        } else if (data.media && Array.isArray(data.media) && data.media.length > 0) {
+          directMp4Url = data.media[0];
+        } else if (data[0] && data[0].media) {
           directMp4Url = data[0].media;
-          thumbnail = data[0].thumbnail || null;
-      } else if (data && data.links && data.links.length > 0) {
-        const videoLink = data.links.find(l => l.type === 'video');
-        if (videoLink) {
-           directMp4Url = videoLink.link;
-           thumbnail = data.picture || null;
         }
-      } else if (data && data.videoUrl) { // Another common format
-         directMp4Url = data.videoUrl;
-         thumbnail = data.thumbnailUrl || null;
-      } else if (data && data.url) { // fallback
-         directMp4Url = data.url;
       }
 
       if (directMp4Url) {
@@ -70,7 +60,7 @@ async function getReelDirectUrl(reelUrl) {
          console.warn("RapidAPI response didn't contain an obvious video URL. Data:", data);
       }
     } catch (e) {
-      console.warn("RapidAPI failed or not subscribed:", e.response?.data || e.message);
+      console.warn("RapidAPI failed:", e.response?.data || e.message);
     }
   }
 

@@ -62,17 +62,17 @@ async function processReelVideo(directMp4Url) {
                 },
                 {
                   text: `You are a knowledge extraction assistant. Given this Instagram Reel video, do the following:
-                  1. Transcribe everything spoken in the video fully and accurately.
-                  2. Assign it to ONE domain from: [Export, Business, AI & Tech, Marketing, Finance, Lifestyle, Other]
-                  3. Generate a structured note with these exact fields:
-                     - title: clear descriptive title
-                     - oneLiner: one catchy sentence summarizing the reel
-                     - summary: 2-3 line summary
-                     - keyTakeaways: array of 3-5 bullet point insights
-                     - actionItems: array of 2-3 action steps
-                     - domain: assigned domain
-                     - transcript: full word-for-word transcription
-                  Return ONLY a valid JSON object with these fields. No extra text. No markdown. Just raw JSON.`
+            1. Transcribe everything spoken in the video fully and accurately.
+            2. Assign it to ONE domain from: [Export, Business, AI & Tech, Marketing, Finance, Lifestyle, Other]
+            3. Generate a structured note with these exact fields:
+               - title: clear descriptive title
+               - oneLiner: one catchy sentence summarizing the reel
+               - summary: 2-3 line summary
+               - keyTakeaways: array of 3-5 bullet point insights
+               - actionItems: array of 2-3 action steps
+               - domain: assigned domain
+               - transcript: full word-for-word transcription
+            Return ONLY a valid JSON object with these fields. No extra text. No markdown. Just raw JSON.`
                 }
               ]
             }]
@@ -95,7 +95,7 @@ async function processReelVideo(directMp4Url) {
     }
 
     // Strip any markdown backticks before parsing JSON
-    responseText = responseText.replace(/^```json\s*/, '').replace(/\s*```$/, '');
+    responseText = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
 
     const noteData = JSON.parse(responseText);
     return noteData;
