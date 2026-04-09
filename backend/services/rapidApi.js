@@ -22,11 +22,11 @@ async function getReelDirectUrl(reelUrl) {
       console.log(`Attempting Stage 1: RapidAPI with clean url: ${cleanUrl}...`);
       
       const response = await fetch(
-        `https://instagram-downloader-download-instagram-videos-stories1.p.rapidapi.com/index?url=${encodeURIComponent(cleanUrl)}`,
+        `https://instagram-reels-downloader-api.p.rapidapi.com/download?url=${encodeURIComponent(cleanUrl)}`,
         {
           method: 'GET',
           headers: {
-            'x-rapidapi-host': 'instagram-downloader-download-instagram-videos-stories1.p.rapidapi.com',
+            'x-rapidapi-host': 'instagram-reels-downloader-api.p.rapidapi.com',
             'x-rapidapi-key': process.env.RAPIDAPI_KEY
           }
         }

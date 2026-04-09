@@ -8,13 +8,10 @@ async function testRapidAPI() {
   }
   const key = apiKeyMatch[1];
   const testUrl = encodeURIComponent("https://www.instagram.com/reel/DKy8VdoC3sf/");
-  const endpoints = ['/', '/index', '/download', '/video/ig', '/api/instagram_download', '/index?url=', '/api/instagram', '/instagram'];
+  const params = ['url', 'link', 'q', 'url_ig', 'ig_url', 'id'];
 
-  for (const ep of endpoints) {
-    const fetchUrl = ep.includes('?') ? 
-      `https://instagram-downloader-download-instagram-videos-stories1.p.rapidapi.com${ep}${testUrl}` : 
-      `https://instagram-downloader-download-instagram-videos-stories1.p.rapidapi.com${ep}?url=${testUrl}`;
-    
+  for (const p of params) {
+    const fetchUrl = `https://instagram-downloader-download-instagram-videos-stories1.p.rapidapi.com/?${p}=${testUrl}`;
     try {
       const response = await fetch(fetchUrl, {
         headers: {
@@ -23,9 +20,9 @@ async function testRapidAPI() {
         }
       });
       const text = await response.text();
-      console.log(`Endpoint ${ep} - Status: ${response.status} - ${text.substring(0, 100)}`);
+      console.log(`Param ${p} - Status: ${response.status} - ${text.substring(0, 100)}`);
     } catch(e) {
-      console.log(`Endpoint ${ep} - Error: ${e.message}`);
+      console.log(`Param ${p} - Error: ${e.message}`);
     }
   }
 }
