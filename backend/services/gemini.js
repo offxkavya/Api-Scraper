@@ -1,7 +1,11 @@
 // backend/services/gemini.js
 const { GoogleGenerativeAI } = require("@google/generative-ai");
-const { GoogleAIFileManager } = require("@google/generative-ai/server");
+const { GoogleAIFileManager, FileState } = require("@google/generative-ai/server");
 const Groq = require('groq-sdk');
+const fs = require('fs');
+const path = require('path');
+const os = require('os');
+const axios = require('axios');
 
 async function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
@@ -41,27 +45,75 @@ async function withRetry(fn, maxRetries = 3, initialDelay = 5000) {
 
 async function processReelVideo(directMp4Url) {
   const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-
   if (!GEMINI_API_KEY) throw new Error("Missing GEMINI_API_KEY");
 
+  const fileManager = new GoogleAIFileManager(GEMINI_API_KEY);
+  const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
+  const model = genAI.getGenerativeModel({ model: "gemini-flash-latest" });
+
+  let tempFilePath = null;
+  let fileUri = null;
+  let fileId = null;
+
   try {
-    const data = await withRetry(async () => {
-      const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${GEMINI_API_KEY}`,
+    // 1. Download the Reel to a temporary file
+    console.log("Downloading video from:", directMp4Url.substring(0, 100) + "...");
+    const tempDir = os.tmpdir();
+    tempFilePath = path.join(tempDir, `reel-${Date.now()}.mp4`);
+    
+    const writer = fs.createWriteStream(tempFilePath);
+    const response = await axios({
+      url: directMp4Url,
+      method: 'GET',
+      responseType: 'stream',
+      timeout: 30000
+    });
+
+    response.data.pipe(writer);
+
+    await new Promise((resolve, reject) => {
+      writer.on('finish', resolve);
+      writer.on('error', reject);
+    });
+    console.log("Download complete:", tempFilePath);
+
+    // 2. Upload to Google AI File API
+    console.log("Uploading to Gemini File API...");
+    const uploadResult = await fileManager.uploadFile(tempFilePath, {
+      mimeType: "video/mp4",
+      displayName: "Instagram Reel",
+    });
+    fileUri = uploadResult.file.uri;
+    fileId = uploadResult.file.name;
+    console.log(`Uploaded file: ${fileId}, URI: ${fileUri}`);
+
+    // 3. Wait for the file to be processed
+    console.log("Waiting for video processing...");
+    let file = await fileManager.getFile(fileId);
+    let attempts = 0;
+    while (file.state === FileState.PROCESSING && attempts < 20) {
+      process.stdout.write(".");
+      await sleep(3000);
+      file = await fileManager.getFile(fileId);
+      attempts++;
+    }
+
+    if (file.state !== FileState.ACTIVE) {
+      throw new Error(`Video processing failed. State: ${file.state}`);
+    }
+    console.log("\nVideo is active.");
+
+    // 4. Generate Content
+    const noteData = await withRetry(async () => {
+      const result = await model.generateContent([
         {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            contents: [{
-              parts: [
-                {
-                  fileData: {
-                    mimeType: "video/mp4",
-                    fileUri: directMp4Url
-                  }
-                },
-                {
-                  text: `You are a knowledge extraction assistant. Given this Instagram Reel video, do the following:
+          fileData: {
+            mimeType: file.mimeType,
+            fileUri: file.uri
+          }
+        },
+        {
+          text: `You are a knowledge extraction assistant. Given this Instagram Reel video, do the following:
             1. Transcribe everything spoken in the video fully and accurately.
             2. Assign it to ONE domain from: [Export, Business, AI & Tech, Marketing, Finance, Lifestyle, Other]
             3. Generate a structured note with these exact fields:
@@ -73,36 +125,36 @@ async function processReelVideo(directMp4Url) {
                - domain: assigned domain
                - transcript: full word-for-word transcription
             Return ONLY a valid JSON object with these fields. No extra text. No markdown. Just raw JSON.`
-                }
-              ]
-            }]
-          })
         }
-      );
+      ]);
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Gemini API Error: ${response.status} ${response.statusText} - ${errorText}`);
-      }
-
-      return await response.json();
+      let responseText = result.response.text();
+      // Strip any markdown backticks before parsing JSON
+      responseText = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
+      return JSON.parse(responseText);
     });
 
-    // Extract the text response and clean it
-    let responseText = data.candidates?.[0]?.content?.parts?.[0]?.text;
-    if (!responseText) {
-      throw new Error("No response content from Gemini API");
-    }
-
-    // Strip any markdown backticks before parsing JSON
-    responseText = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
-
-    const noteData = JSON.parse(responseText);
     return noteData;
 
   } catch (error) {
     console.error("Gemini processing error:", error);
+    if (error.response?.data) {
+        console.error("Gemini API detailed error:", JSON.stringify(error.response.data));
+    }
     throw error;
+  } finally {
+    // Cleanup temporary file
+    if (tempFilePath && fs.existsSync(tempFilePath)) {
+      try {
+        fs.unlinkSync(tempFilePath);
+        console.log("Temporary file deleted.");
+      } catch (e) {
+        console.warn("Failed to delete temp file:", e.message);
+      }
+    }
+    // Note: We don't delete from File API here to allow for short-term reuse or if processing is needed, 
+    // but in a production app you might want to call fileManager.deleteFile(fileId).
+    // Google deletes these after 48 hours anyway.
   }
 }
 
