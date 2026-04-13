@@ -18,18 +18,32 @@ async function getReelDirectUrl(reelUrl) {
 
   // --- STAGE 1: RAPIDAPI (Primary - Most Reliable) ---
   if (RAPIDAPI_KEY) {
-    // We try two different popular RapidAPI hosts to increase success rate
-    const hosts = [
-      'instagram-reels-downloader-api.p.rapidapi.com',
-      'instagram-downloader-download-instagram-videos-stories1.p.rapidapi.com'
+    // We try multiple RapidAPI hosts to increase success rate
+    // Each host can have a different endpoint path
+    const apis = [
+      {
+        host: 'instagram-downloader-scraper-reels-igtv-posts-stories.p.rapidapi.com',
+        path: '/scraper'
+      },
+      {
+        host: 'instagram-reels-downloader-api.p.rapidapi.com',
+        path: '/download'
+      },
+      {
+        host: 'instagram-looter2.p.rapidapi.com',
+        path: '/reels' // Just a guess for looter2, but adding it for variety
+      }
     ];
 
-    for (const host of hosts) {
+    for (const api of apis) {
+      const host = api.host;
+      const apiPath = api.path;
+
       try {
         console.log(`Attempting Stage 1: RapidAPI with host ${host}...`);
         
         const response = await fetch(
-          `https://${host}/download?url=${encodeURIComponent(cleanUrl)}`,
+          `https://${host}${apiPath}?url=${encodeURIComponent(cleanUrl)}`,
           {
             method: 'GET',
             headers: {
@@ -46,35 +60,42 @@ async function getReelDirectUrl(reelUrl) {
         }
 
         const data = await response.json();
-        console.log(`RapidAPI (${host}) response:`, JSON.stringify(data).substring(0, 200) + "...");
-
+        
         let directMp4Url = null;
         let thumbnail = null;
 
         // Adapt to various response structures
         if (data) {
-          // Check for .data nested structure first (very common)
+          // Check for .data nested structure (very common)
           const source = data.data || data;
           
           let candidateUrl = null;
           let candidateThumb = null;
 
-          // Structure 1: { media: "...", thumbnail: "..." }
-          if (typeof source.media === 'string') {
+          // Structure 1: { data: [{ media: "...", thumb: "..." }] } (scraper-reels API)
+          if (Array.isArray(source) && source.length > 0) {
+            const item = source[0];
+            candidateUrl = item.media || item.url || item.video;
+            candidateThumb = item.thumb || item.thumbnail;
+          }
+          // Structure 2: { medias: [{ url: "...", type: "video" }] } (instagram-reels-downloader-api)
+          else if (Array.isArray(source.medias) && source.medias.length > 0) {
+            // Find the first video media
+            const videoMedia = source.medias.find(m => m.type === 'video' || m.extension === 'mp4') || source.medias[0];
+            candidateUrl = videoMedia.url;
+            candidateThumb = source.thumbnail || source.thumb;
+          }
+          // Structure 3: { media: "...", thumbnail: "..." }
+          else if (typeof source.media === 'string') {
             candidateUrl = source.media;
             candidateThumb = source.thumbnail;
           } 
-          // Structure 2: { url: "..." }
+          // Structure 4: { url: "..." }
           else if (source.url) {
             candidateUrl = source.url;
             candidateThumb = source.thumbnail || source.thumb;
           }
-          // Structure 3: Arrays
-          else if (Array.isArray(source.media) && source.media.length > 0) {
-            candidateUrl = typeof source.media[0] === 'string' ? source.media[0] : source.media[0].url;
-            candidateThumb = source.media[0].thumbnail;
-          }
-          // Structure 4: Nested objects
+          // Structure 5: Nested objects
           else if (source.main_media) {
             candidateUrl = source.main_media;
           }
@@ -83,15 +104,21 @@ async function getReelDirectUrl(reelUrl) {
           }
 
           // VALIDATE: Ensure it's not just the original URL and looks like a CDN link
-          if (candidateUrl && 
-              candidateUrl.includes('fbcdn.net') || 
-              candidateUrl.includes('.mp4') || 
-              candidateUrl.includes('video') ||
-              !candidateUrl.includes('instagram.com/reel/')) {
-            directMp4Url = candidateUrl;
-            thumbnail = candidateThumb;
-          } else {
-            console.warn(`RapidAPI Host ${host} returned an invalid/original URL: ${candidateUrl}`);
+          if (candidateUrl) {
+            const isCdn = candidateUrl.includes('fbcdn.net') || 
+                          candidateUrl.includes('cdninstagram.com') ||
+                          candidateUrl.includes('.mp4') || 
+                          candidateUrl.includes('video');
+            
+            const isOriginal = candidateUrl.includes('instagram.com/reel/') || 
+                               candidateUrl.includes('instagram.com/p/');
+
+            if (isCdn || !isOriginal) {
+              directMp4Url = candidateUrl;
+              thumbnail = candidateThumb;
+            } else {
+              console.warn(`RapidAPI Host ${host} returned an invalid/original URL: ${candidateUrl}`);
+            }
           }
         }
 
@@ -127,13 +154,16 @@ async function getReelDirectUrl(reelUrl) {
     const isLinux = process.platform === 'linux';
     const ytDlpPath = path.join(__dirname, '..', 'bin', isLinux ? 'yt-dlp_linux' : 'yt-dlp');
     
+    // Add /usr/local/bin to PATH for yt-dlp dependencies if needed
+    const env = { ...process.env, PATH: `${process.env.PATH}:/usr/local/bin:/usr/bin:/bin` };
+
     const { stdout } = await execFileAsync(ytDlpPath, [
       '-j', 
       '--no-check-certificates',
       '--geo-bypass',
       '--user-agent', 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.5 Mobile/15E148 Safari/604.1',
       cleanUrl
-    ]);
+    ], { env });
     
     const data = JSON.parse(stdout);
     let directMp4Url = null;
