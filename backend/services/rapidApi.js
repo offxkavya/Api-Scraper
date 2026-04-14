@@ -22,16 +22,24 @@ async function getReelDirectUrl(reelUrl) {
     // Each host can have a different endpoint path
     const apis = [
       {
-        host: 'instagram-downloader-scraper-reels-igtv-posts-stories.p.rapidapi.com',
-        path: '/scraper'
-      },
-      {
         host: 'instagram-reels-downloader-api.p.rapidapi.com',
         path: '/download'
       },
       {
+        host: 'instagram-downloader-download-instagram-videos-stories1.p.rapidapi.com',
+        path: '/'
+      },
+      {
         host: 'instagram-looter2.p.rapidapi.com',
-        path: '/reels' // Just a guess for looter2, but adding it for variety
+        path: '/reels' 
+      },
+      {
+        host: 'social-media-video-downloader.p.rapidapi.com',
+        path: '/smvd/get/instagram'
+      },
+      {
+        host: 'instagram-downloader-scraper-reels-igtv-posts-stories.p.rapidapi.com',
+        path: '/scraper'
       }
     ];
 
@@ -43,7 +51,7 @@ async function getReelDirectUrl(reelUrl) {
         console.log(`Attempting Stage 1: RapidAPI with host ${host}...`);
         
         const response = await fetch(
-          `https://${host}${apiPath}?url=${encodeURIComponent(cleanUrl)}`,
+          `https://${host}${apiPath}${apiPath === '/' ? '' : ''}?url=${encodeURIComponent(cleanUrl)}`,
           {
             method: 'GET',
             headers: {
@@ -56,7 +64,7 @@ async function getReelDirectUrl(reelUrl) {
         if (!response.ok) {
           const errorText = await response.text();
           console.warn(`RapidAPI Host ${host} returned ${response.status}: ${errorText.substring(0, 100)}`);
-          continue; // Try next host
+          continue; 
         }
 
         const data = await response.json();
@@ -64,46 +72,36 @@ async function getReelDirectUrl(reelUrl) {
         let directMp4Url = null;
         let thumbnail = null;
 
-        // Adapt to various response structures
         if (data) {
-          // Check for .data nested structure (very common)
-          const source = data.data || data;
+          // Check for .data nested structure or .result
+          const source = data.data || data.result || data;
           
           let candidateUrl = null;
           let candidateThumb = null;
 
-          // Structure 1: { data: [{ media: "...", thumb: "..." }] } (scraper-reels API)
+          // Structure 1: Array of items
           if (Array.isArray(source) && source.length > 0) {
             const item = source[0];
-            candidateUrl = item.media || item.url || item.video;
-            candidateThumb = item.thumb || item.thumbnail;
+            candidateUrl = item.media || item.url || item.video || item.download_url || item.video_url;
+            candidateThumb = item.thumb || item.thumbnail || item.thumbnail_url;
           }
-          // Structure 2: { medias: [{ url: "...", type: "video" }] } (instagram-reels-downloader-api)
+          // Structure 2: medias array
           else if (Array.isArray(source.medias) && source.medias.length > 0) {
-            // Find the first video media
-            const videoMedia = source.medias.find(m => m.type === 'video' || m.extension === 'mp4') || source.medias[0];
+            const videoMedia = source.medias.find(m => m.type === 'video' || m.extension === 'mp4' || (m.url && m.url.includes('.mp4'))) || source.medias[0];
             candidateUrl = videoMedia.url;
-            candidateThumb = source.thumbnail || source.thumb;
+            candidateThumb = source.thumbnail || source.thumb || videoMedia.thumbnail;
           }
-          // Structure 3: { media: "...", thumbnail: "..." }
-          else if (typeof source.media === 'string') {
-            candidateUrl = source.media;
-            candidateThumb = source.thumbnail;
-          } 
-          // Structure 4: { url: "..." }
-          else if (source.url) {
-            candidateUrl = source.url;
-            candidateThumb = source.thumbnail || source.thumb;
-          }
-          // Structure 5: Nested objects
-          else if (source.main_media) {
-            candidateUrl = source.main_media;
-          }
-          else if (source.result && Array.isArray(source.result) && source.result.length > 0) {
-            candidateUrl = source.result[0].url || source.result[0].video;
+          // Structure 3: direct fields
+          else {
+            candidateUrl = source.media || source.url || source.video || source.download_link || source.video_url || source.links?.[0]?.url;
+            candidateThumb = source.thumbnail || source.thumb || source.thumbnail_url;
           }
 
-          // VALIDATE: Ensure it's not just the original URL and looks like a CDN link
+          // Case for some APIs that return a list of links
+          if (!candidateUrl && Array.isArray(source.links) && source.links.length > 0) {
+              candidateUrl = source.links[0].url || source.links[0].link;
+          }
+
           if (candidateUrl) {
             const isCdn = candidateUrl.includes('fbcdn.net') || 
                           candidateUrl.includes('cdninstagram.com') ||
