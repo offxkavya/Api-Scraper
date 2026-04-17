@@ -20,6 +20,16 @@ async function getReelDirectUrl(reelUrl) {
   if (RAPIDAPI_KEY) {
     const apis = [
       {
+        host: 'instagram-scraper-api2.p.rapidapi.com', // Premium Instagram Scraper
+        path: '/v1/post_info',
+        param: 'shortcode_or_url'
+      },
+      {
+        host: 'instagram47.p.rapidapi.com', // RocketAPI
+        path: '/post_info',
+        param: 'shortcode_or_url'
+      },
+      {
         host: 'social-media-video-downloader.p.rapidapi.com',
         path: '/smvd/get/instagram',
         param: 'url'
@@ -32,11 +42,6 @@ async function getReelDirectUrl(reelUrl) {
       {
         host: 'instagram-reels-downloader-api.p.rapidapi.com',
         path: '/download',
-        param: 'url'
-      },
-      {
-        host: 'instagram-looter2.p.rapidapi.com',
-        path: '/reels',
         param: 'url'
       }
     ];
@@ -61,7 +66,11 @@ async function getReelDirectUrl(reelUrl) {
 
         if (!response.ok) {
           const errorText = await response.text();
-          console.warn(`[Extraction] ${host} returned ${response.status}: ${errorText.substring(0, 50)}...`);
+          if (response.status === 403) {
+            console.warn(`[Extraction] ${host} REQUIRES SUBSCRIPTION (403).`);
+          } else {
+            console.warn(`[Extraction] ${host} returned ${response.status}: ${errorText.substring(0, 50)}...`);
+          }
           continue; 
         }
 

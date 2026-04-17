@@ -72,7 +72,13 @@ async function processReelVideo(directMp4Url) {
       url: directMp4Url,
       method: 'GET',
       responseType: 'stream',
-      timeout: 30000
+      timeout: 60000, // 60 seconds total for download
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+        'Referer': 'https://www.instagram.com/',
+        'Accept': 'video/webm,video/any,video/*;q=0.9,image/webp,image/apng,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.9'
+      }
     });
 
     response.data.pipe(writer);

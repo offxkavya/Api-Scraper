@@ -54,6 +54,14 @@ const authenticateUser = async (req, res, next) => {
 
 app.post('/api/extract', authenticateUser, async (req, res) => {
   const { reelUrl } = req.body;
+  
+  // Set a strict 90-second timeout for this request
+  req.setTimeout(90000, () => {
+    if (!res.headersSent) {
+      res.status(408).json({ error: "Request timed out during extraction. Please try again or check the Reel URL." });
+    }
+  });
+
   if (!reelUrl || !reelUrl.match(/instagram\.com\/(reel|p)\//)) {
     return res.status(400).json({ error: "Invalid Instagram Reel URL" });
   }
