@@ -11,6 +11,24 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+// --- Startup Configuration Check ---
+console.log("--- ReelNotes Backend Startup ---");
+const requiredEnv = ['GEMINI_API_KEY', 'RAPIDAPI_KEY'];
+const missing = requiredEnv.filter(k => !process.env[k]);
+if (missing.length > 0) {
+  console.error(`CRITICAL ERROR: Missing environment variables: ${missing.join(', ')}`);
+  console.error("Please check your .env file.");
+} else {
+  console.log("✔ Basic environment variables found.");
+}
+
+if (!process.env.FIREBASE_SERVICE_ACCOUNT_JSON) {
+  console.warn("⚠ WARNING: FIREBASE_SERVICE_ACCOUNT_JSON is missing. Auth and Firestore will be MOCKED.");
+} else {
+  console.log("✔ Firebase Service Account JSON found.");
+}
+console.log("----------------------------------");
+
 // Middleware to authenticate Firebase user token
 const authenticateUser = async (req, res, next) => {
   const authHeader = req.headers.authorization;

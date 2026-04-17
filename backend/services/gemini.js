@@ -23,7 +23,9 @@ async function withRetry(fn, maxRetries = 3, initialDelay = 5000) {
       lastError = error;
       const isRateLimit = error.message?.includes('429') ||
         error.status === 429 ||
-        error.message?.includes('Quota exceeded');
+        error.status === 503 ||
+        error.message?.includes('Quota exceeded') ||
+        error.message?.includes('503');
 
       if (isRateLimit && i < maxRetries - 1) {
         // Extract retry delay from error if present (Google API often includes it)
@@ -49,7 +51,11 @@ async function processReelVideo(directMp4Url) {
 
   const fileManager = new GoogleAIFileManager(GEMINI_API_KEY);
   const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
-  const model = genAI.getGenerativeModel({ model: "gemini-flash-latest" });
+  
+  // Try to get a working model - prioritize 2.5-flash (verified available in 2026 env)
+  const testModels = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"];
+  const modelName = testModels[0];
+  const model = genAI.getGenerativeModel({ model: modelName });
 
   let tempFilePath = null;
   let fileUri = null;

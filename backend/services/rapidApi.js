@@ -18,114 +18,88 @@ async function getReelDirectUrl(reelUrl) {
 
   // --- STAGE 1: RAPIDAPI (Primary - Most Reliable) ---
   if (RAPIDAPI_KEY) {
-    // We try multiple RapidAPI hosts to increase success rate
-    // Each host can have a different endpoint path
     const apis = [
       {
-        host: 'instagram-reels-downloader-api.p.rapidapi.com',
-        path: '/download'
+        host: 'social-media-video-downloader.p.rapidapi.com',
+        path: '/smvd/get/instagram',
+        param: 'url'
       },
       {
         host: 'instagram-downloader-download-instagram-videos-stories1.p.rapidapi.com',
-        path: '/'
+        path: '/',
+        param: 'url'
+      },
+      {
+        host: 'instagram-reels-downloader-api.p.rapidapi.com',
+        path: '/download',
+        param: 'url'
       },
       {
         host: 'instagram-looter2.p.rapidapi.com',
-        path: '/reels' 
-      },
-      {
-        host: 'social-media-video-downloader.p.rapidapi.com',
-        path: '/smvd/get/instagram'
-      },
-      {
-        host: 'instagram-downloader-scraper-reels-igtv-posts-stories.p.rapidapi.com',
-        path: '/scraper'
+        path: '/reels',
+        param: 'url'
       }
     ];
 
     for (const api of apis) {
-      const host = api.host;
-      const apiPath = api.path;
+      const { host, path: apiPath, param } = api;
 
       try {
-        console.log(`Attempting Stage 1: RapidAPI with host ${host}...`);
+        console.log(`[Extraction] Attempting Stage 1: RapidAPI (${host})...`);
         
-        const response = await fetch(
-          `https://${host}${apiPath}${apiPath === '/' ? '' : ''}?url=${encodeURIComponent(cleanUrl)}`,
-          {
-            method: 'GET',
-            headers: {
-              'x-rapidapi-host': host,
-              'x-rapidapi-key': RAPIDAPI_KEY
-            }
+        // Construct URL carefully. If apiPath is '/', we don't want '//?url'
+        const baseUrl = `https://${host}${apiPath}`;
+        const fetchUrl = `${baseUrl}${baseUrl.includes('?') ? '&' : '?'}${param}=${encodeURIComponent(cleanUrl)}`;
+
+        const response = await fetch(fetchUrl, {
+          method: 'GET',
+          headers: {
+            'x-rapidapi-host': host,
+            'x-rapidapi-key': RAPIDAPI_KEY
           }
-        );
+        });
 
         if (!response.ok) {
           const errorText = await response.text();
-          console.warn(`RapidAPI Host ${host} returned ${response.status}: ${errorText.substring(0, 100)}`);
+          console.warn(`[Extraction] ${host} returned ${response.status}: ${errorText.substring(0, 50)}...`);
           continue; 
         }
 
         const data = await response.json();
+        console.log(`[Extraction] ${host} returned data. Parsing...`);
         
         let directMp4Url = null;
         let thumbnail = null;
 
         if (data) {
-          // Check for .data nested structure or .result
-          const source = data.data || data.result || data;
+          // Comprehensive parsing logic for various API responses
+          const source = data.data || data.result || data.item || (Array.isArray(data) ? data[0] : data);
           
-          let candidateUrl = null;
-          let candidateThumb = null;
-
-          // Structure 1: Array of items
-          if (Array.isArray(source) && source.length > 0) {
+          if (Array.isArray(source)) {
             const item = source[0];
-            candidateUrl = item.media || item.url || item.video || item.download_url || item.video_url;
-            candidateThumb = item.thumb || item.thumbnail || item.thumbnail_url;
-          }
-          // Structure 2: medias array
-          else if (Array.isArray(source.medias) && source.medias.length > 0) {
-            const videoMedia = source.medias.find(m => m.type === 'video' || m.extension === 'mp4' || (m.url && m.url.includes('.mp4'))) || source.medias[0];
-            candidateUrl = videoMedia.url;
-            candidateThumb = source.thumbnail || source.thumb || videoMedia.thumbnail;
-          }
-          // Structure 3: direct fields
-          else {
-            candidateUrl = source.media || source.url || source.video || source.download_link || source.video_url || source.links?.[0]?.url;
-            candidateThumb = source.thumbnail || source.thumb || source.thumbnail_url;
+            directMp4Url = item?.media || item?.url || item?.video || item?.download_link;
+            thumbnail = item?.thumbnail || item?.thumb;
+          } else {
+            directMp4Url = source?.media || source?.url || source?.video || source?.download_link || source?.video_url || source?.links?.[0]?.url;
+            thumbnail = source?.thumbnail || source?.thumb || source?.thumbnail_url;
           }
 
-          // Case for some APIs that return a list of links
-          if (!candidateUrl && Array.isArray(source.links) && source.links.length > 0) {
-              candidateUrl = source.links[0].url || source.links[0].link;
-          }
-
-          if (candidateUrl) {
-            const isCdn = candidateUrl.includes('fbcdn.net') || 
-                          candidateUrl.includes('cdninstagram.com') ||
-                          candidateUrl.includes('.mp4') || 
-                          candidateUrl.includes('video');
-            
-            const isOriginal = candidateUrl.includes('instagram.com/reel/') || 
-                               candidateUrl.includes('instagram.com/p/');
-
-            if (isCdn || !isOriginal) {
-              directMp4Url = candidateUrl;
-              thumbnail = candidateThumb;
-            } else {
-              console.warn(`RapidAPI Host ${host} returned an invalid/original URL: ${candidateUrl}`);
-            }
+          // Special case for medias array
+          if (!directMp4Url && source.medias && Array.isArray(source.medias)) {
+            const video = source.medias.find(m => m.type === 'video') || source.medias[0];
+            directMp4Url = video.url;
+            thumbnail = source.thumbnail || video.thumbnail;
           }
         }
 
-        if (directMp4Url) {
-            console.log(`RapidAPI Success with host ${host}.`);
+        if (directMp4Url && (directMp4Url.includes('fbcdn.net') || directMp4Url.includes('cdninstagram.com') || directMp4Url.includes('.mp4'))) {
+            console.log(`[Extraction] SUCCESS with ${host}.`);
             return { directMp4Url, thumbnail };
+        } else {
+          console.warn(`[Extraction] ${host} returned data but no valid direct MP4 URL found.`);
         }
       } catch (e) {
-        console.warn(`RapidAPI Host ${host} failed:`, e.message);
+        console.warn(`[Extraction] ${host} failed:`, e.message);
       }
     }
   }
