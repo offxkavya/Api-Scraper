@@ -47,7 +47,7 @@ export default function Dashboard() {
   });
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-500">
+    <div className="space-y-9 animate-in fade-in duration-500">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <h1 className="text-3xl font-bold text-white tracking-tight">Your Knowledge Base</h1>
         <div className="relative">
