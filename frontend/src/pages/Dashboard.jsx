@@ -52,15 +52,33 @@ export default function Dashboard() {
     <div className="space-y-8 animate-in fade-in duration-500">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <h1 className="text-3xl font-bold text-white tracking-tight">Your Knowledge Base</h1>
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 w-4 h-4" />
-          <input 
-            type="text" 
-            placeholder="Search notes..." 
-            value={searchQuery}
-            onChange={e => setSearchQuery(e.target.value)}
-            className="bg-card border border-zinc-800 rounded-full py-2 pl-9 pr-4 text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary w-full md:w-64 text-white"
-          />
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-1 bg-zinc-900 border border-zinc-800 p-1 rounded-lg">
+            <button 
+              onClick={() => setViewMode('grid')}
+              className={`p-1.5 rounded-md transition-all ${viewMode === 'grid' ? 'bg-zinc-800 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-300'}`}
+              title="Grid View"
+            >
+              <LayoutGrid className="w-4 h-4" />
+            </button>
+            <button 
+              onClick={() => setViewMode('table')}
+              className={`p-1.5 rounded-md transition-all ${viewMode === 'table' ? 'bg-zinc-800 text-white shadow-sm' : 'text-zinc-500 hover:text-zinc-300'}`}
+              title="Table View"
+            >
+              <List className="w-4 h-4" />
+            </button>
+          </div>
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 w-4 h-4" />
+            <input 
+              type="text" 
+              placeholder="Search notes..." 
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              className="bg-card border border-zinc-800 rounded-full py-2 pl-9 pr-4 text-sm focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary w-full md:w-64 text-white"
+            />
+          </div>
         </div>
       </div>
 
@@ -82,18 +100,27 @@ export default function Dashboard() {
       </div>
 
       {loading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {[1,2,3,4,5,6].map(i => (
-            <div key={i} className="card h-80 animate-pulse bg-zinc-900/50">
-               <div className="aspect-video bg-zinc-800"></div>
-               <div className="p-5 space-y-3">
-                 <div className="h-6 bg-zinc-800 rounded w-3/4"></div>
-                 <div className="h-4 bg-zinc-800 rounded w-full"></div>
-                 <div className="h-4 bg-zinc-800 rounded w-5/6"></div>
-               </div>
-            </div>
-          ))}
-        </div>
+        viewMode === 'grid' ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {[1,2,3,4,5,6].map(i => (
+              <div key={i} className="card h-80 animate-pulse bg-zinc-900/50">
+                 <div className="aspect-video bg-zinc-800"></div>
+                 <div className="p-5 space-y-3">
+                   <div className="h-6 bg-zinc-800 rounded w-3/4"></div>
+                   <div className="h-4 bg-zinc-800 rounded w-full"></div>
+                   <div className="h-4 bg-zinc-800 rounded w-5/6"></div>
+                 </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="w-full border border-zinc-800 rounded-xl overflow-hidden animate-pulse">
+            <div className="h-12 bg-zinc-900 border-b border-zinc-800"></div>
+            {[1,2,3,4,5].map(i => (
+              <div key={i} className="h-16 bg-zinc-900/50 border-b border-zinc-800/50"></div>
+            ))}
+          </div>
+        )
       ) : filteredNotes.length === 0 ? (
         <div className="text-center py-20 flex flex-col items-center">
           <div className="w-20 h-20 bg-zinc-900 rounded-full flex items-center justify-center mb-4">
@@ -109,11 +136,15 @@ export default function Dashboard() {
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredNotes.map(note => (
-            <NoteCard key={note.id} note={note} />
-          ))}
-        </div>
+        viewMode === 'grid' ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {filteredNotes.map(note => (
+              <NoteCard key={note.id} note={note} />
+            ))}
+          </div>
+        ) : (
+          <NoteTable notes={filteredNotes} />
+        )
       )}
     </div>
   );
