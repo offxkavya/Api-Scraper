@@ -31,7 +31,7 @@ export default function NoteTable({ notes }) {
               const colorClass = DOMAIN_COLORS[note.domain] || DOMAIN_COLORS['Other'];
               return (
                 <tr key={note.id} className="glass-row group">
-                  <td className="px-6 py-6 vertical-top">
+                  <td className="px-6 py-6 align-top">
                     <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold border uppercase tracking-tight ${colorClass}`}>
                       {note.domain}
                     </span>
