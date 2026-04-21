@@ -3,7 +3,8 @@ import { useAuth } from '../contexts/AuthContext';
 import { db } from '../firebase';
 import { collection, query, orderBy, onSnapshot } from 'firebase/firestore';
 import NoteCard from '../components/NoteCard';
-import { Search, Inbox } from 'lucide-react';
+import NoteTable from '../components/NoteTable';
+import { Search, Inbox, LayoutGrid, List } from 'lucide-react';
 
 const DOMAINS = ['All', 'Export', 'Business', 'AI & Tech', 'Marketing', 'Finance', 'Lifestyle', 'Other'];
 
@@ -12,6 +13,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
+  const [viewMode, setViewMode] = useState('table'); // Default to table as requested
   const { currentUser } = useAuth();
 
   useEffect(() => {
