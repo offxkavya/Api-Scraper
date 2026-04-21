@@ -25,6 +25,12 @@
   .card {
     @apply bg-card border border-zinc-800 rounded-xl overflow-hidden shadow-xl;
   }
+  .glass-row {
+    @apply hover:bg-zinc-800/50 transition-colors border-b border-zinc-800/50;
+  }
+  .table-header {
+    @apply bg-zinc-900/80 backdrop-blur-md sticky top-0 z-10 border-b border-zinc-800;
+  }
 }
 
 /* Custom scrollbar for better dark mode look */
