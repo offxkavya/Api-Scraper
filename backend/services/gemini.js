@@ -240,25 +240,7 @@ async function processReelVideo(directMp4Url) {
     }
   }
 
-  } catch (error) {
-    console.error("Gemini processing error:", error);
-    if (error.response?.data) {
-        console.error("Gemini API detailed error:", JSON.stringify(error.response.data));
-    }
     throw error;
-  } finally {
-    // Cleanup temporary file
-    if (tempFilePath && fs.existsSync(tempFilePath)) {
-      try {
-        fs.unlinkSync(tempFilePath);
-        console.log("Temporary file deleted.");
-      } catch (e) {
-        console.warn("Failed to delete temp file:", e.message);
-      }
-    }
-    // Note: We don't delete from File API here to allow for short-term reuse or if processing is needed, 
-    // but in a production app you might want to call fileManager.deleteFile(fileId).
-    // Google deletes these after 48 hours anyway.
   }
 }
 
