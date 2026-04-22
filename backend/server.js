@@ -67,13 +67,28 @@ app.post('/api/extract', authenticateUser, async (req, res) => {
   }
 
   try {
+    // Stage 0: Cache Check (Deduplication)
+    if (db) {
+       console.log(`[Server] Checking cache for: ${reelUrl}`);
+       const existingNotes = await db.collection('users').doc(req.user.uid).collection('notes')
+         .where('reelUrl', '==', reelUrl)
+         .limit(1)
+         .get();
+       
+       if (!existingNotes.empty) {
+         console.log("[Server] Cache hit! Returning existing note.");
+         const cachedData = existingNotes.docs[0].data();
+         return res.json({ id: existingNotes.docs[0].id, ...cachedData, _cached: true });
+       }
+    }
+
     // Step 1: RapidAPI
     const { directMp4Url, thumbnail } = await getReelDirectUrl(reelUrl);
     if (!directMp4Url) {
       return res.status(400).json({ error: "Failed to extract video URL from Instagram." });
     }
 
-    // Step 2: Gemini Integration
+    // Step 2: Gemini / Fallback Integration
     const noteData = await processReelVideo(directMp4Url);
 
     // Step 3: Save to Firestore
@@ -96,7 +111,12 @@ app.post('/api/extract', authenticateUser, async (req, res) => {
 
   } catch (error) {
     console.error("Extraction Error:", error);
-    res.status(500).json({ error: error.message || "Internal server error during extraction." });
+    // Categorize error for frontend
+    const isRateLimit = error.message?.includes('Rate Limit') || error.message?.includes('429');
+    res.status(isRateLimit ? 429 : 500).json({ 
+      error: error.message || "Internal server error during extraction.",
+      type: isRateLimit ? 'RATE_LIMIT' : 'FATAL'
+    });
   }
 });
 
