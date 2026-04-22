@@ -18,14 +18,11 @@ export default function Home() {
     // Remove the numeric error code block if present [404 Not Found]
     cleanMsg = cleanMsg.replace(/\[\d+ [^\]]+\]\s*/, '');
     
-    if (msg.includes('429') || msg.toLowerCase().includes('quota exceeded') || msg.toLowerCase().includes('too many requests')) {
-      return "The AI is currently busy (Rate Limit reached). Please wait a minute and try again.";
+    if (msg.includes('429') || msg.toLowerCase().includes('quota exceeded') || msg.toLowerCase().includes('rate limit')) {
+      return "The AI is reaching its limit. I'm currently retrying with alternative models/providers. Please don't close this page.";
     }
-    if (msg.includes('404')) {
-        return "The requested AI model version was not found. I've updated the system to use a more stable version; please try again.";
-    }
-    if (msg.includes('503') || msg.toLowerCase().includes('service unavailable')) {
-        return "The AI service is temporarily unavailable. Retrying soon might help.";
+    if (msg.includes('busy')) {
+       return "System is busy, retrying momentarily...";
     }
     return cleanMsg.length > 150 ? cleanMsg.substring(0, 150) + "..." : cleanMsg;
   };
