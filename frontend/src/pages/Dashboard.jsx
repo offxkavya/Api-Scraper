@@ -70,7 +70,7 @@ export default function Dashboard() {
             </button>
           </div>
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 w-4 h-4" />
+            <Search className="absolute left-2 top-1/2 -translate-y-1/2 text-zinc-500 w-4 h-4" />
             <input 
               type="text" 
               placeholder="Search notes..." 
