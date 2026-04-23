@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { Video, Loader2, CheckCircle, Database, Brain, Sparkles } from 'lucide-react';
+import { db } from '../firebase';
+import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 
 export default function Home() {
   const [url, setUrl] = useState('');
@@ -55,8 +57,6 @@ export default function Home() {
       
       if (data.note) {
         setStatus('saving');
-        const { collection, addDoc, serverTimestamp } = await import('firebase/firestore');
-        const { db } = await import('../firebase');
         const noteToSave = { ...data.note };
         delete noteToSave.id;
         noteToSave.createdAt = serverTimestamp();
