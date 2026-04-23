@@ -239,9 +239,6 @@ async function processReelVideo(directMp4Url) {
        console.info(`[AI] Falling back to next tier...`);
     }
   }
-
-    throw error;
-  }
 }
 
 module.exports = { processReelVideo };
