@@ -122,7 +122,7 @@ export default function Dashboard() {
           </div>
         )
       ) : filteredNotes.length === 0 ? (
-        <div className="text-center py-21 flex flex-col items-center">
+        <div className="text-center py-20 flex flex-col items-center">
           <div className="w-20 h-20 bg-zinc-900 rounded-full flex items-center justify-center mb-4">
             <Inbox className="w-10 h-10 text-zinc-600" />
           </div>
