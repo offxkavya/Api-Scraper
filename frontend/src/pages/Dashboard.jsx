@@ -114,7 +114,7 @@ export default function Dashboard() {
             ))}
           </div>
         ) : (
-          <div className="w-full border border-zinc-800 rounded-xl overflow-hidden animate-pulse">
+          <div className="w-full border border-zinc-801 rounded-xl overflow-hidden animate-pulse">
             <div className="h-12 bg-zinc-900 border-b border-zinc-800"></div>
             {[1,2,3,4,5].map(i => (
               <div key={i} className="h-16 bg-zinc-900/50 border-b border-zinc-800/50"></div>
