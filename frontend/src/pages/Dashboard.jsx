@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { db } from '../firebase';
-import { collection, query, orderBy, onSnapshot } from 'firebase/firestore';
+import { collection, query, orderBy, getDocs } from 'firebase/firestore';
+import { onSnapshot } from 'firebase/firestore';
 import NoteCard from '../components/NoteCard';
 import NoteTable from '../components/NoteTable';
-import { Search, Inbox, LayoutGrid, List } from 'lucide-react';
+import { Search, Inbox, LayoutGrid, List, Download } from 'lucide-react';
+import * as XLSX from 'xlsx';
 
 const DOMAINS = ['All', 'Export', 'Business', 'AI & Tech', 'Marketing', 'Finance', 'Lifestyle', 'Other'];
 
@@ -13,7 +15,8 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
-  const [viewMode, setViewMode] = useState('table'); // Default to table as requested
+  const [viewMode, setViewMode] = useState('table');
+  const [exporting, setExporting] = useState(false);
   const { currentUser } = useAuth();
 
   useEffect(() => {
@@ -39,6 +42,39 @@ export default function Dashboard() {
     return unsubscribe;
   }, [currentUser]);
 
+  const handleExport = async () => {
+    setExporting(true);
+    try {
+      const q = query(
+        collection(db, 'users', currentUser.uid, 'notes'),
+        orderBy('createdAt', 'desc')
+      );
+      const snapshot = await getDocs(q);
+      const rows = snapshot.docs.map(doc => {
+        const d = doc.data();
+        return {
+          Date: d.createdAt?.toDate ? d.createdAt.toDate().toLocaleDateString() : '',
+          Domain: d.domain || '',
+          Title: d.title || '',
+          'One Liner': d.oneLiner || '',
+          Summary: d.summary || '',
+          'Key Takeaways': Array.isArray(d.keyTakeaways) ? d.keyTakeaways.join('; ') : (d.keyTakeaways || ''),
+          'Action Items': Array.isArray(d.actionItems) ? d.actionItems.join('; ') : (d.actionItems || ''),
+          Transcript: d.transcript || '',
+          'Reel URL': d.reelUrl || '',
+        };
+      });
+      const ws = XLSX.utils.json_to_sheet(rows);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Notes');
+      XLSX.writeFile(wb, 'ReelNotes_Export.xlsx');
+    } catch (err) {
+      console.error('Export failed:', err);
+    } finally {
+      setExporting(false);
+    }
+  };
+
   const filteredNotes = notes.filter(n => {
     const matchesDomain = activeTab === 'All' || n.domain === activeTab;
     const matchesSearch = !searchQuery || 
@@ -53,6 +89,14 @@ export default function Dashboard() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <h1 className="text-3xl font-bold text-white tracking-tight">Your Knowledge Base</h1>
         <div className="flex items-center gap-4">
+          <button
+            onClick={handleExport}
+            disabled={exporting}
+            className="flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary/90 disabled:opacity-60 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-all"
+          >
+            <Download className="w-4 h-4" />
+            {exporting ? 'Exporting...' : 'Export to Excel'}
+          </button>
           <div className="flex items-center gap-1 bg-zinc-900 border border-zinc-800 p-1 rounded-lg">
             <button 
               onClick={() => setViewMode('grid')}
